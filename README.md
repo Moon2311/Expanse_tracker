@@ -1,134 +1,158 @@
 # Spendly — Expense Tracker
 
-This repository contains **Spendly**, an expense tracker with personal expenses, groups, splits, notifications, and chat.
+Spendly tracks **personal and group expenses**, **splits**, **notifications**, and **chat**. This repository ships a **Django REST API** (`backend/`) and a **React + Vite** SPA (`frontend/`).
 
-There are **two ways** to run the project:
+| Part | Role | Local URL |
+|------|------|-----------|
+| **Django API** | JSON API, JWT auth, PostgreSQL | http://127.0.0.1:8000/api/ |
+| **React app** | Web UI (proxies `/api` to Django in dev) | http://localhost:5173 |
 
-| Stack | What it is | Typical URL |
-|-------|------------|-------------|
-| **Flask** (root) | Classic server-rendered app (`app.py`, Jinja templates, PostgreSQL) | http://127.0.0.1:5001 |
-| **Django + React** | REST API (`backend/`) + SPA (`frontend/`) | API: http://127.0.0.1:8000 · UI: http://localhost:5173 |
-
-They use **different code and databases tables** for users. Pick one stack for day-to-day use, or run both if you maintain two databases.
+The API uses its **own user database** (UUID users). If you also run an optional **Flask** app from the repo root (when `app.py` is present), treat it as a **separate** app with its own tables.
 
 ---
 
 ## Prerequisites
 
 - **Python 3.11+** (3.12 recommended)
-- **PostgreSQL** running locally (or reachable over the network)
-- **Node.js 18+** and **npm** (only for the React frontend)
-
-Optional: `git` to clone the repo.
+- **PostgreSQL** (local or remote)
+- **Node.js 18+** and **npm** (frontend)
 
 ---
 
-## 1. Clone and environment file
+## 1. Clone and configure environment
 
 ```bash
 git clone <your-repo-url> expense-tracker
 cd expense-tracker
 ```
 
-Copy the template and fill in secrets (see comments inside the file for what each token is):
+Copy env templates and edit real values (never commit `.env` — it is listed in `.gitignore`):
 
 ```bash
 cp .env.example .env
-# Django API also needs backend/.env (same values are fine):
 cp .env.example backend/.env
-# or: cd backend && ln -sf ../.env .env
+# Or share one file:
+# ln -sf ../.env backend/.env
 ```
 
-- **Flask** — run from the repo root so **`.env`** is loaded next to `app.py` (see `.env.example`).
-- **Django** — reads **`backend/.env`** (see `backend/spendly/settings.py`).
-- **React** — **`frontend/.env`** from **`frontend/.env.example`** (`VITE_API_BASE` only; no secrets).
+Optional frontend override (e.g. production API URL):
 
-**Credentials you provide:** `FLASK_SECRET_KEY`, `DJANGO_SECRET_KEY`, and PostgreSQL **`DB_*`** (you choose the DB user/password). **GitHub Actions** uses the built-in **`GITHUB_TOKEN`** to push the Docker image to GHCR — nothing to add to `.env`. **Kubernetes** should use the same variable *names* as in `.env.example`, stored in a Secret (see `deploy/kubernetes/backend-secret.example.yaml`).
+```bash
+cp frontend/.env.example frontend/.env
+```
 
-Create the database in PostgreSQL before starting apps, for example:
+| You must set | Purpose |
+|--------------|---------|
+| `DJANGO_SECRET_KEY` | Django signing (generate a long random string) |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | PostgreSQL connection |
+| `CORS_ALLOWED_ORIGINS` | Browser origins allowed to call the API (comma-separated) |
+
+If you use the **Flask** app at the root, also set `FLASK_SECRET_KEY` in the root `.env`.
+
+**CI / cloud:** GitHub Actions uses **`GITHUB_TOKEN`** to push the backend Docker image to **GHCR** — nothing to add to `.env`. For Kubernetes, use the same variable **names** as in `.env.example` inside a Secret; see `deploy/kubernetes/backend-secret.example.yaml` (do not commit a filled `backend-secret.yaml`).
+
+Create the database:
 
 ```bash
 createdb spendly
-# or in psql: CREATE DATABASE spendly;
+# or: psql -c "CREATE DATABASE spendly;"
 ```
 
-**Note:** If your database name contains spaces, quote it in PostgreSQL and set `DB_NAME` exactly as created.
+If the database name contains spaces, match `DB_NAME` exactly to how PostgreSQL stores it.
 
 ---
 
-## 2. Run the Flask app (classic UI)
+## 2. Run the Django API
 
 ```bash
-cd expense-tracker
+cd backend
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -c "from database import init_db; init_db()"   # creates/updates tables
-python app.py
 ```
 
-Open **http://127.0.0.1:5001** — register, log in, add expenses, groups, etc.
-
----
-
-## 3. Run the Django API + React frontend
-
-### 3a. Backend (Django)
+Ensure **`backend/.env`** exists (section 1).
 
 ```bash
-cd expense-tracker/backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Ensure **`backend/.env`** exists with `DB_*` set (see section 1).
-
-```bash
-cd expense-tracker/backend
 python manage.py migrate
 python manage.py runserver 8000
 ```
 
-API base: **http://127.0.0.1:8000/api/**
+- API: **http://127.0.0.1:8000/api/**
+- Health check: **http://127.0.0.1:8000/healthz**
+- Admin (optional): `python manage.py createsuperuser` → http://127.0.0.1:8000/admin/
 
-Optional admin user:
+More endpoint detail: **`backend/README.md`**.
 
-```bash
-python manage.py createsuperuser
-```
+---
 
-Then open **http://127.0.0.1:8000/admin/**.
+## 3. Run the React frontend
 
-### 3b. Frontend (React + Vite)
-
-In a **second terminal**:
+Second terminal:
 
 ```bash
-cd expense-tracker/frontend
+cd frontend
 npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** — the dev server proxies `/api` to `http://127.0.0.1:8000`, so keep Django running on port **8000**.
+Open **http://localhost:5173**. Dev mode proxies **`/api`** to **http://127.0.0.1:8000**, so keep Django on port **8000**.
 
-Register a **new account** in the React app (Django has its own user table, separate from Flask).
-
----
-
-## 4. Quick checklist
-
-| Step | Flask | Django + React |
-|------|--------|----------------|
-| PostgreSQL running | Yes | Yes |
-| `.env` with `DB_*` | Root `.env` | `backend/.env` (or symlink to root) |
-| Install deps | `pip install -r requirements.txt` | `backend`: pip · `frontend`: npm |
-| Init DB | `init_db()` via Python | `python manage.py migrate` |
-| Start | `python app.py` | `runserver 8000` + `npm run dev` |
+Register in the SPA — users are stored by the Django API, not by any optional Flask app.
 
 ---
 
-## 5. Tests (Flask)
+## 4. Optional: Flask app (repo root)
+
+Some trees include a classic **Flask + Jinja** UI (`app.py`, `database/`, `templates/`, …). If those exist:
+
+```bash
+cd expense-tracker
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python -c "from database import init_db; init_db()"
+python app.py
+```
+
+Use a root **`.env`** with `FLASK_SECRET_KEY` and the same **`DB_*`** variables. Default port is often **5001** (check `app.py`).
+
+---
+
+## 5. Docker (backend image)
+
+Build and run the API container (PostgreSQL must be reachable from the container; pass env vars or an env file):
+
+```bash
+cd backend
+docker build -t spendly-backend:local .
+docker run --rm -p 8000:8000 --env-file .env spendly-backend:local
+```
+
+Uses **Gunicorn**; worker count via **`WEB_CONCURRENCY`** (default `3`). Production images run **`collectstatic`** at build time (WhiteNoise).
+
+---
+
+## 6. Kubernetes & CI
+
+- **Manifests:** `deploy/kubernetes/` — namespace, Deployment, Service, Ingress example, migrate **Job**, and **`backend-secret.example.yaml`** (copy to `backend-secret.yaml` and apply; the real secret file is gitignored).
+- **GitHub Actions:** `.github/workflows/backend-ci.yml` — on changes under `backend/`, runs migrate/check/collectstatic against Postgres, then on **`main`** builds and pushes **`ghcr.io/<lowercase-owner>/spendly-backend`** (`:latest` and `:<sha>`).
+
+---
+
+## 7. Quick checklist (Django + React)
+
+| Step | Action |
+|------|--------|
+| PostgreSQL | Running; database created |
+| Env | `backend/.env` from `backend/.env.example` |
+| Backend | `pip install -r requirements.txt` → `migrate` → `runserver 8000` |
+| Frontend | `npm install` → `npm run dev` |
+
+---
+
+## 8. Tests
+
+If the repo includes Flask tests:
 
 ```bash
 source .venv/bin/activate
@@ -137,36 +161,35 @@ pytest
 
 ---
 
-## 6. Troubleshooting
+## 9. Troubleshooting
 
-- **`relation "api_..." does not exist` (Django)**  
-  Run migrations: `cd backend && python manage.py migrate`.
-
-- **`could not connect to server` / database errors**  
-  Check PostgreSQL is running and `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` in `.env`.
-
-- **React calls API but gets 404/502**  
-  Start Django on **port 8000** and use `npm run dev` (Vite proxy). Or set `VITE_API_BASE=http://127.0.0.1:8000/api` in `frontend/.env`.
-
-- **CORS errors** (if you call the API from another origin)  
-  Add your origin to `CORS_ALLOWED_ORIGINS` in `.env`.
+| Issue | What to try |
+|-------|-------------|
+| `relation "api_..." does not exist` | `cd backend && python manage.py migrate` |
+| Database connection errors | Check `DB_*` in `backend/.env` and that Postgres is up |
+| React 404/502 on API | Run Django on **8000** with `npm run dev`, or set `VITE_API_BASE` in `frontend/.env` |
+| CORS errors | Add your site origin to `CORS_ALLOWED_ORIGINS` in `backend/.env` |
 
 ---
 
-## 7. Project layout (short)
+## 10. Project layout
 
 ```
 expense-tracker/
-├── app.py                 # Flask entry
-├── database/              # Flask DB helpers (PostgreSQL)
-├── templates/             # Flask HTML
-├── static/                # Flask CSS/JS
-├── backend/               # Django project + REST API
+├── .env.example              # Env template (root + shared vars)
+├── .gitignore                # Ignores .env, venvs, node_modules, K8s secrets, …
+├── requirements.txt          # Optional Flask stack (when app.py exists)
+├── backend/
+│   ├── .env.example
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── requirements-prod.txt   # + gunicorn (Docker)
 │   ├── manage.py
-│   ├── spendly/           # settings, urls
-│   └── api/               # models, views, serializers
-├── frontend/              # Vite + React SPA
-└── README.md              # this file
+│   ├── spendly/              # Django settings & URLs
+│   └── api/                  # Models, views, serializers
+├── frontend/
+│   ├── .env.example
+│   └── src/                  # React app
+├── deploy/kubernetes/        # K8s manifests + secret example
+└── .github/workflows/        # Backend CI & image push
 ```
-
-More API detail: **`backend/README.md`**.
