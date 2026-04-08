@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spendly-backend
+  namespace: spendly
+  labels:
+    app: spendly-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: spendly-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

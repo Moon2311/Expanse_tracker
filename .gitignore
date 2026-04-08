@@ -1,0 +1,69 @@
+# --- Secrets & local env (never commit) ---
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test
+backend/.env
+frontend/.env
+
+# Real K8s secret (copy of backend-secret.example.yaml with live values)
+deploy/kubernetes/backend-secret.yaml
+
+# --- Python ---
+.venv/
+venv/
+**/venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# --- Node / frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# --- Django ---
+backend/staticfiles/
+backend/media/
+*.sqlite3
+db.sqlite3
+
+# --- Logs & temp ---
+*.log
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDE (optional — remove a block if your team commits these) ---
+.idea/
+*.sublime-*

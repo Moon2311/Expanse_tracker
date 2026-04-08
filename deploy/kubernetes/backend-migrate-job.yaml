@@ -1,0 +1,25 @@
+# Run once before or after deploying a new image when migrations changed:
+#   kubectl apply -f backend-migrate-job.yaml
+#   kubectl wait --for=condition=complete job/spendly-migrate -n spendly --timeout=300s
+#   kubectl delete job spendly-migrate -n spendly
+#
+# Uses the same image and DB env as the Deployment.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spendly-migrate
+  namespace: spendly
+spec:
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/OWNER/REPO/spendly-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - secretRef:
+                name: spendly-backend-env

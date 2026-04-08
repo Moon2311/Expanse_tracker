@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spendly-backend
+  namespace: spendly
+  labels:
+    app: spendly-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spendly-backend
+  template:
+    metadata:
+      labels:
+        app: spendly-backend
+    spec:
+      containers:
+        - name: api
+          # Replace with your registry image (e.g. ghcr.io/your-org/expense-tracker-backend:latest)
+          image: ghcr.io/OWNER/REPO/spendly-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: spendly-backend-env
+          env:
+            - name: WEB_CONCURRENCY
+              value: "3"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
